@@ -1,3 +1,43 @@
+async function fetchWithRetry(
+  action: string, 
+  payload: any, 
+  retries = 3, 
+  delay = 1000
+): Promise<any> {
+  for (let i = 0; i < retries; i++) {
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, payload }),
+    });
+
+    if (response.ok) {
+      return response.json();
+    }
+
+    if (response.status === 429) {
+      console.warn(`Rate limited (429). Retrying in ${delay}ms... (Attempt ${i + 1}/${retries})`);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // exponential backoff
+        continue;
+      }
+    }
+
+    // For other errors, or if retries are exhausted
+    const text = await response.text();
+    let errorMessage = text;
+    try {
+      const errorData = JSON.parse(text);
+      errorMessage = errorData.error || errorMessage;
+    } catch (e) {
+      // Not JSON
+    }
+    throw new Error(errorMessage || `Server error ${response.status}`);
+  }
+  throw new Error("Max retries exceeded for Gemini API");
+}
+
 export async function generateNPCResponse(
   npcName: string, 
   npcRole: string, 
@@ -5,75 +45,15 @@ export async function generateNPCResponse(
   history: { role: string; parts: { text: string }[] }[] = [], 
   context?: { reputation: string; worldEvent: string; bias: string }
 ) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "generateNPCResponse",
-      payload: { npcName, npcRole, userMessage, history, context },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Gemini API Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("generateNPCResponse", { npcName, npcRole, userMessage, history, context });
 }
 
 export async function analyzeCombatPatterns(playerHistory: string[], enemyType: string) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "analyzeCombatPatterns",
-      payload: { playerHistory, enemyType },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Combat Analysis Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("analyzeCombatPatterns", { playerHistory, enemyType });
 }
 
 export async function generateQuest(location: string, difficulty: string) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "generateQuest",
-      payload: { location, difficulty },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Quest Generation Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("generateQuest", { location, difficulty });
 }
 
 export async function generateQuantumQuest(
@@ -85,76 +65,16 @@ export async function generateQuantumQuest(
     playerBrutality: number;
   }
 ) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "generateQuantumQuest",
-      payload: { location, baseDifficulty, suaParams },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Quantum Quest Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("generateQuantumQuest", { location, baseDifficulty, suaParams });
 }
 
 export async function generateSovereignAnalysis(
   rep: { [key: string]: number }, 
   diff: { [key: string]: number }
 ) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "generateSovereignAnalysis",
-      payload: { rep, diff },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Sovereign Analysis Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("generateSovereignAnalysis", { rep, diff });
 }
 
 export async function getAlchemyAssistant(potionName: string) {
-  const response = await fetch("/api/gemini", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      action: "getAlchemyAssistant",
-      payload: { potionName },
-    }),
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    let errorMessage = text;
-    try {
-      const errorData = JSON.parse(text);
-      errorMessage = errorData.error || errorMessage;
-    } catch (e) {
-      // Not JSON
-    }
-    console.error("Alchemy Error Context:", errorMessage);
-    throw new Error(errorMessage || `Server error ${response.status}`);
-  }
-  return response.json();
+  return fetchWithRetry("getAlchemyAssistant", { potionName });
 }
